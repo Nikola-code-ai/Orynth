@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>aerolab_simulation</name>
+  <version>0.0.1</version>
+  <description>Aerolab Simulation Configuration for 5 drone swarm</description>
+  <maintainer email="team@aerolab.todo">AeroLab Team</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>std_msgs</depend>
+
+  <!-- Aerostack2 core -->
+  <depend>as2_core</depend>
+  <depend>as2_msgs</depend>
+
+  <!-- Platform layer — Ignition Fortress sim platform -->
+  <depend>as2_platform_gazebo</depend>
+
+  <!-- State estimation — ground truth plugin for simulation -->
+  <depend>as2_state_estimator</depend>
+
+  <!-- Motion control — PID speed controller -->
+  <depend>as2_motion_controller</depend>
+
+  <!-- Behavior servers — TakeOff, GoTo, Land, FollowPath -->
+  <depend>as2_behaviors_motion</depend>
+
+  <!-- Required by the motion controller at runtime -->
+  <depend>as2_motion_reference_handlers</depend>
+
+  <!-- Python API for mission_test.py -->
+  <depend>as2_python_api</depend>
+
+  <!-- Simulation world assets — already used by swarm_gazebo_launch.py -->
+  <depend>as2_gazebo_assets</depend>
+
+  <!-- RMW implementations (exec dependency only, not build deps) -->
+  <exec_depend>rmw_cyclonedds_cpp</exec_depend>
+  <exec_depend>rmw_zenoh_cpp</exec_depend>
+
+  <!-- TF message type for tf_static_bridge (Zenoh workaround) -->
+  <depend>tf2_msgs</depend>
+  
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

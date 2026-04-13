@@ -1,0 +1,10 @@
+/**:
+  ros__parameters:
+    use_sim_time: true
+    # Gazebo world name — must match world_name in swarm_config.json
+    world_name: "empty"
+    # Required by as2_platform_gazebo_node (declare_parameter without defaults)
+    cmd_freq: 100.0
+    info_freq: 10.0
+    enable_takeoff_platform: false
+    enable_land_platform: false

@@ -1,0 +1,39 @@
+# Build artifacts — rebuilt inside the container, not needed in build context
+build/
+install/
+log/
+
+# Git history — not needed in the image
+.git/
+
+# Python cache
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.egg-info/
+
+# Documentation
+docs/
+
+# Ephemeral AS2 / debug exports
+frames_*.gv
+frames_*.pdf
+tmp_aerostack/
+
+# Tooling & IDE configs (not needed at runtime)
+.claude/
+.github/
+.devcontainer/
+.vscode/
+.idea/
+
+# Tests & ROS bag recordings
+tests/
+*.bag
+*.db3
+*.mcap
+flights/
+
+# Environment files
+.env
+.env.*

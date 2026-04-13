@@ -1,0 +1,45 @@
+# ── ROS 2 / colcon build artifacts ─────────────────────────────
+build/
+install/
+log/
+
+# ── Python ─────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+.pytest_cache/
+
+# ── Ephemeral AS2 / debug exports ──────────────────────────────
+frames_*.gv
+frames_*.pdf
+tmp_aerostack/
+
+# ── ROS bag recordings & flight logs ───────────────────────────
+*.bag
+*.db3
+*.mcap
+flights/
+
+# ── Claude Code personal state (team config goes in settings.json, not settings.local.json) ──
+.claude/settings.local.json
+.claude/*.lock
+
+# ── IDE / editor ───────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Environment / secrets ──────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Compiled native extensions (colcon C++ packages) ───────────
+*.so
+*.dylib

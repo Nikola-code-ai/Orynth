@@ -1,0 +1,17 @@
+/**:
+  ros__parameters:
+    use_sim_time: true
+    # ground_truth reads directly from the Gazebo bridge pose topic.
+    # Zero lag, no drift — correct choice for simulation.
+    plugin_name: "ground_truth"
+
+    # Base TF frame names — used to build earth → map → odom → base_link chain
+    base_frame: "base_link"
+    odom_frame: "odom"
+    map_frame: "map"
+    global_ref_frame: "earth"
+
+    # ground_truth plugin parameters
+    use_gps: false
+    set_origin_on_start: false
+    use_gazebo_tf: false

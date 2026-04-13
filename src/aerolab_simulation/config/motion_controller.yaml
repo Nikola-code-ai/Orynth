@@ -1,0 +1,60 @@
+/**:
+  ros__parameters:
+    use_sim_time: true
+
+    # Controller plugin and frequency — required by controller_manager
+    plugin_name: "pid_speed_controller"
+    cmd_freq: 100.0
+    info_freq: 10.0
+    odom_frame_id: "odom"
+    base_frame_id: "base_link"
+    use_bypass: true
+    tf_timeout_threshold: 0.05
+
+    # pid_speed_controller plugin parameters (nested structure expected by the plugin)
+    proportional_limitation: true
+
+    position_control:
+      reset_integral: false
+      antiwindup_cte: 0.5
+      alpha: 0.0
+      kp: {x: 4.0, y: 4.0, z: 5.0}
+      kd: {x: 0.5, y: 0.5, z: 0.8}
+      ki: {x: 0.05, y: 0.05, z: 0.1}
+
+    speed_control:
+      reset_integral: false
+      antiwindup_cte: 0.5
+      alpha: 0.0
+      kp: {x: 3.0, y: 3.0, z: 4.0}
+      kd: {x: 0.1, y: 0.1, z: 0.2}
+      ki: {x: 0.1, y: 0.1, z: 0.1}
+
+    speed_in_a_plane_control:
+      reset_integral: false
+      antiwindup_cte: 0.5
+      alpha: 0.0
+      height:
+        kp: 4.0
+        kd: 0.2
+        ki: 0.1
+      speed:
+        kp: {x: 3.0, y: 3.0}
+        kd: {x: 0.1, y: 0.1}
+        ki: {x: 0.1, y: 0.1}
+
+    trajectory_control:
+      reset_integral: false
+      antiwindup_cte: 0.5
+      alpha: 0.0
+      kp: {x: 5.0, y: 5.0, z: 6.0}
+      kd: {x: 0.5, y: 0.5, z: 0.8}
+      ki: {x: 0.05, y: 0.05, z: 0.1}
+
+    yaw_control:
+      reset_integral: false
+      antiwindup_cte: 0.5
+      alpha: 0.0
+      kp: 2.0
+      kd: 0.1
+      ki: 0.05

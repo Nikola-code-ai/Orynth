@@ -1,0 +1,35 @@
+services:
+  aerolab:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    image: aerolab_stack
+    container_name: aerolab_dev
+    # Use host network for ROS 2 compatibility (DDS)
+    network_mode: "host"
+    # Privileged mode is often necessary for Gazebo/GPU and hardware access
+    privileged: true
+    # Larger /dev/shm so DDS/Zenoh shared memory segments don't exhaust the
+    # default 64 MiB when running 5 drones with sensors.
+    shm_size: "2gb"
+    environment:
+      - DISPLAY=${DISPLAY}
+      - QT_X11_NO_MITSHM=1
+      - ORYNTH_RMW=${ORYNTH_RMW:-cyclonedds}
+    volumes:
+      # Mount X11 socket for GUI rendering
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      # Mount the current workspace directory inside the container for live editing
+      - .:/root/aerolab_ws:rw
+    # Keep the container running interactively
+    stdin_open: true # equivalent to docker run -i
+    tty: true        # equivalent to docker run -t
+    command: bash
+    # Enable NVIDIA GPU passthrough for hardware acceleration
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
