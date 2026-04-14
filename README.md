@@ -1,4 +1,5 @@
 <div align="center">
+  <img src="docs/assets/banner.png" alt="Orynth" />
   <h1>Orynth — AeroLab Swarm Architecture</h1>
   <p>Autonomous 5-Drone Swarm · ROS 2 Humble · Aerostack2 · Gazebo Sim · Docker</p>
 </div>
