@@ -10,12 +10,14 @@
 
 Orynth is a ground-up development environment for the coordination, simulation, and edge-compute AI deployment of a 5-drone multi-agent swarm. It is containerized from day one to ensure environment consistency across development machines and future deployment nodes.
 
-The system is designed around a deliberate radio bandwidth architecture, segmenting network responsibilities so that the swarm can sustain heavy payload streams (LiDAR and 4K optics) without saturating the shared RF channel:
+The system is designed around a deliberate radio bandwidth architecture, segmenting network responsibilities so that the swarm can sustain heavy payload streams (LiDAR and camera data) without saturating the shared RF channel:
 
 - **The Mothership (Drone 0)** — Central routing hub, global path planner, and LiDAR aggregator.
-- **The Support Fleet (Drones 1–4)** — Decentralized edge workers dedicated to YOLOv11 computer vision and local localization.
+- **The Support Fleet (Drones 1–4)** — Decentralized edge workers dedicated to onboard perception and local localization.
 
-> **Status:** Phase 1 complete. Full 5-drone simulation stack, teleoperation mode, and diamond formation flying are operational.
+> **Status:** Aerostack2 simulation is operational today. ArduPilot SITL and real-flight integration are planned as separate bringup tracks.
+
+> **Architecture note:** The current repo runs `Aerostack2 + Gazebo Fortress` for swarm development. The real-flight target is `ArduPilot`, not PX4. See [System Architecture](docs/system_architecture.md) and [ADR 0001](docs/adr/0001-hybrid-control-stack.md) before extending the hardware path.
 
 ---
 
@@ -27,8 +29,8 @@ The system is designed around a deliberate radio bandwidth architecture, segment
 | **Middleware** | ROS 2 Humble |
 | **Swarm Framework** | Aerostack2 (official pre-built Docker base image) |
 | **Simulation** | Ignition Gazebo Fortress (`as2_gazebo_assets`) |
-| **Networking** | CycloneDDS (default) / Zenoh (alternative) |
-| **Edge AI** | PyTorch + Ultralytics YOLOv11 |
+| **Networking** | CycloneDDS (default) / Zenoh (field evaluation path) |
+| **Edge AI** | PyTorch + configurable detector runtime |
 | **Containerization** | Docker + Docker Compose |
 
 ---
@@ -68,7 +70,7 @@ The Gazebo↔ROS2 bridges are launched per-drone alongside the node stack.
 ## Implemented Features
 
 ### 1. Containerized Development Environment
-A Dockerfile extending `aerostack2/nightly-humble` with PyTorch, Ultralytics YOLOv11, OpenCV (headless), and Eclipse Zenoh. The container exposes your GPU and X11 display for Gazebo rendering.
+A Dockerfile extending `aerostack2/nightly-humble` with PyTorch, OpenCV (headless), and both middleware options already installed. The container exposes your GPU and X11 display for Gazebo rendering.
 
 ### 2. One-Command Swarm Bringup
 `swarm_bringup_launch.py` starts the Gazebo world and all 5 drone stacks in a single command (plus the Zenoh router when `rmw:=zenoh`). Each stack includes the Gazebo bridges, platform node, state estimator, motion controller, and all 5 behavior action servers.
@@ -158,12 +160,10 @@ Every extra terminal needs the workspace sourced. `docker exec` bypasses the ent
 ```bash
 # On the host — open a second shell into the already-running container:
 docker exec -it $(docker ps --filter ancestor=aerolab_stack --format '{{.Names}}' | head -1) bash
-
-# Inside that shell:
-source /opt/ros/humble/setup.bash
-source /root/aerostack2_ws/install/setup.bash
-source /root/aerolab_ws/install/setup.bash
 ```
+
+The entrypoint appends the workspace setup to `~/.bashrc`, so additional
+interactive shells should already be configured.
 
 ---
 
@@ -226,12 +226,18 @@ Commands drone0 through a waypoint sequence and verifies drones 1–4 hold their
 
 ## Roadmap
 
+Authoritative planning documents:
+
+- [System Architecture](docs/system_architecture.md)
+- [Deliverables Matrix](docs/deliverables_matrix.md)
+- [Upstream References](docs/upstream_references.md)
+
 | Phase | Focus | Status |
 |---|---|---|
 | 1 | Simulation foundation — 5 drones, teleop, formation | Complete |
 | 2 | Ground control station — Foxglove GCS, live swarm view | Planned |
-| 3 | Swarm behaviour — formation library, state machine, collision avoidance | Planned |
-| 4 | Perception pipeline — YOLOv11 per drone, multi-drone fusion | Planned |
-| 5 | Mission intelligence — BT missions, search/surround | Planned |
-| 6 | Sensor fusion & mapping — LiDAR + vision, labelled 3D map | Planned |
-| 7 | Hardware transition — Pixhawk 6C, companion computer, real flight | Planned |
+| 3 | Swarm behaviour — formation library, state model, shared command API | Planned |
+| 4 | ArduPilot SITL bootstrap — early AP_DDS validation on the real-flight path | Planned |
+| 5 | Perception pipeline — onboard detection per drone, multi-drone fusion | Planned |
+| 6 | Mission autonomy & mapping — BT missions, search/survey, labelled 3D map | Planned |
+| 7 | Hardware transition — ArduPilot FCU, companion computer, real flight | Planned |

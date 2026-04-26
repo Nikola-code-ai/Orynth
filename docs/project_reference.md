@@ -1,6 +1,10 @@
 # AeroLab Project Reference
 
-Technical reference covering the AeroLab drone swarm stack — Docker setup, Aerostack2 architecture, PX4 integration, perception pipeline, and licensing.
+Technical reference covering the AeroLab drone swarm stack — Docker setup, Aerostack2 simulation, ArduPilot transition planning, perception pipeline, and licensing.
+
+> **Status note:** The authoritative architecture split is documented in
+> [System Architecture](system_architecture.md). This reference keeps the
+> implementation details that are still useful for the current repo.
 
 ---
 
@@ -102,18 +106,19 @@ Aerostack2 is an autonomy middleware framework that runs on the companion comput
 ├──────────────────────────────────────────┤
 │          STATE ESTIMATION                │  pose, velocity, odometry fusion
 ├──────────────────────────────────────────┤
-│           PLATFORM LAYER                 │  as2_platform_gazebo / pixhawk
+│           PLATFORM LAYER                 │  as2_platform_gazebo / ArduPilot adapter
 └──────────────────────────────────────────┘
 ```
 
 ### Platform Layer
 
-Abstracts the autopilot or simulator. Swapping platforms is the only change needed to move between simulation and hardware:
+Abstracts the simulator or autopilot backend. In this repo, Aerostack2 is the
+current simulation platform and ArduPilot is the planned flight backend:
 
 | Environment | Plugin |
 |---|---|
 | Simulation | `as2_ign_gazebo` |
-| Real hardware | `as2_platform_pixhawk` |
+| Real flight target | `AP_DDS` via the planned ArduPilot adapter |
 
 ### Behavior Layer
 
@@ -209,82 +214,89 @@ Behavior → motion controller → platform → Gazebo physics
 
 ---
 
-## 3. PX4 vs Aerostack2
+## 3. ArduPilot vs Aerostack2
 
-They are not alternatives — they operate at different layers and are used together on real hardware.
+For this repository, they are not alternatives. Aerostack2 is the current
+swarm-development framework in simulation, while ArduPilot is the target
+real-flight stack.
 
 ```
 ┌─────────────────────────────────────┐
 │         YOUR MISSION CODE           │
 ├─────────────────────────────────────┤
-│           AEROSTACK2                │  companion computer / ROS 2
+│           AEROSTACK2                │  current simulation mission layer
 ├─────────────────────────────────────┤
-│         PX4-AUTOPILOT               │  flight controller firmware
+│        ARDUPILOT AP_DDS             │  target FCU ROS 2 interface
 ├─────────────────────────────────────┤
-│         HARDWARE / PHYSICS          │  Pixhawk / Gazebo in sim
+│         HARDWARE / PHYSICS          │  autopilot + vehicle + simulator
 └─────────────────────────────────────┘
 ```
 
-| Concern | PX4-Autopilot | Aerostack2 |
+| Concern | ArduPilot | Aerostack2 |
 |---|---|---|
 | Motor mixing & output | Yes | No |
 | Attitude / rate control (PID) | Yes | No |
 | Sensor fusion (IMU, GPS, baro) | Yes | No |
 | State estimation (EKF) | Yes | No |
-| Flight modes (takeoff, land, offboard) | Yes | Calls PX4 for these |
+| Flight modes (takeoff, land, guided) | Yes | Calls the backend for these |
 | Motion primitives (go_to, follow) | No | Yes |
 | Behavior trees / mission logic | No | Yes |
 | Multi-drone coordination | Minimal | Yes — first class |
 | Platform abstraction | N/A | Yes |
-| ROS 2 interface | Via uXRCE-DDS bridge | Native |
+| ROS 2 interface | Via AP_DDS | Native |
 
-### PX4 Ecosystem
+### ArduPilot ROS 2 Ecosystem
 
-"PX4" refers to a broader ecosystem, not just the firmware:
+ArduPilot now exposes ROS 2 through AP_DDS. The current upstream components
+that matter for this repo are:
 
-- **PX4-Autopilot** — the flight controller firmware (`github.com/PX4/PX4-Autopilot`)
-- **px4_msgs** — ROS 2 message definitions
-- **uXRCE-DDS** — bridge connecting PX4-Autopilot to ROS 2
-- **PX4-ROS2-Interface-Library** — helper library for offboard control
-- **QGroundControl** — ground station software
+- **ArduPilot** — flight-controller firmware with AP_DDS support
+- **ardupilot_msgs** — ROS 2 messages and services exposed by AP_DDS
+- **micro_ros_agent** — DDS/XRCE bridge used by SITL and hardware setups
+- **ardupilot_sitl** — ROS 2 launch path for SITL
+- **ardupilot_gz** — Gazebo integration path for ROS 2 + ArduPilot
+- **MAVROS** — fallback ROS 2 bridge for MAVLink workflows and ecosystem tooling
 
 ### In Simulation
 
-The current simulation stack has no PX4:
+The current repo simulation stack does not run ArduPilot today:
 
 ```
 flock_orchestrator.py → Aerostack2 → as2_ign_gazebo → Ignition Gazebo physics
 ```
 
-PX4 SITL can optionally be added for higher-fidelity simulation of flight controller behaviour at the cost of added complexity.
+ArduPilot SITL will be added as a parallel bringup path rather than forced into
+the Aerostack2 Gazebo launch.
 
 ---
 
 ## 4. Moving to Hardware
 
-The code stack stays identical. Only the platform plugin changes.
+The mission layer should stay recognizable, but the backend does not collapse to
+a one-line platform swap.
 
 **Simulation:**
 ```
 flock_orchestrator.py → Aerostack2 → as2_ign_gazebo → Ignition Gazebo
 ```
 
-**Hardware:**
+**Planned ArduPilot SITL / hardware path:**
 ```
-flock_orchestrator.py → Aerostack2 → as2_platform_pixhawk → uXRCE-DDS → PX4-Autopilot → Pixhawk
+mission layer → shared vehicle adapter → AP_DDS / MAVROS fallback → ArduPilot FCU
 ```
 
 ### Steps
 
-1. **Flight controller**: Pixhawk 6C or 6X per drone, flashed with PX4-Autopilot firmware
-2. **Companion computer**: Raspberry Pi 5, Jetson Orin Nano, or similar SBC per drone running ROS 2 + Aerostack2
-3. **Launch file swap**: Replace `as2_ign_gazebo` launch with `as2_platform_pixhawk`, pointed at the Pixhawk serial port
-4. **Networking**: Zenoh (already installed) handles unreliable multi-hop mesh networking between drones better than default FastDDS
-5. **Ground station**: Laptop runs the orchestrator node, talking to all drones over WiFi/mesh radio via the same ROS 2 topics
+1. **Flight controller**: ArduPilot-compatible autopilot per drone, with AP_DDS enabled where supported
+2. **Companion computer**: Jetson Orin Nano or similar SBC per drone running ROS 2 mission and perception nodes
+3. **SITL parity first**: Stand up `ardupilot_sitl` and `ardupilot_gz` before attempting hardware integration
+4. **Shared API**: Keep swarm logic on the adapter boundary now implemented in this repo
+5. **Networking**: Keep CycloneDDS as the baseline; evaluate Zenoh only after measuring your actual RF link conditions
 
 ### Intermediate Step: Hardware-in-the-Loop (HIL)
 
-Connect a real Pixhawk to the laptop while Gazebo simulates physics and PX4 runs on real firmware. Good bridge between full simulation and flying hardware.
+Validate AP_DDS, health checks, and mission-layer commands against SITL and then
+single-aircraft hardware before attempting swarm field tests.
 
 ---
 
@@ -344,8 +356,9 @@ AGPL-3.0 requires that if you distribute software using it — including softwar
 The `ultralytics` package contains all YOLO versions (v8, v9, v10, v11). Version is chosen at runtime by the weights file loaded:
 
 ```python
-model = YOLO('yolo11n.pt')  # YOLOv11 — recommended
-model = YOLO('yolov8n.pt')  # YOLOv8
+model = YOLO('yolo11n.pt')  # current lightweight candidate
+model = YOLO('yolov8n.pt')  # alternate backend candidate
 ```
 
-**YOLOv11 is preferred**: faster inference at equivalent accuracy, smaller model size, better suited for edge deployment on companion computers. API is identical to v8.
+Model choice should stay configuration-driven. The repository should not bake a
+single detector family into mission or operator interfaces.

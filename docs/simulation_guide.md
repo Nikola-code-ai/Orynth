@@ -2,6 +2,10 @@
 
 A technical reference for teammates working inside the AeroLab swarm simulation.
 
+> This guide covers the current `Aerostack2 + Gazebo Fortress` simulation path
+> only. It does not describe the planned ArduPilot SITL or hardware bringup.
+> See [System Architecture](system_architecture.md) for the control-stack split.
+
 ---
 
 ## 1. Overview
@@ -228,7 +232,8 @@ Commands drone0 through a waypoint sequence and checks that drones 1–4 hold th
 
 ## 9. Computer Vision (Phase 4 — Planned)
 
-The Docker image includes `opencv-python-headless` and `ultralytics` (YOLOv11). The integration path when Phase 4 begins:
+The Docker image includes `opencv-python-headless` and `ultralytics`. The
+integration path when Phase 4 begins:
 
 1. Add a camera plugin to the Gazebo drone model in `swarm_config.json` — standard `/image_raw` topics will be published.
 2. Write a perception node using YOLO to detect targets and publish offsets.

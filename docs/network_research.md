@@ -2,6 +2,11 @@
 
 Research into communication protocols, middleware, and networking approaches for multi-drone swarm systems. Covers academic literature (2022–2025), open-source projects, and practical recommendations for the Orynth stack.
 
+> **Status note:** Treat this file as a research memo, not as the final
+> architecture contract. The current repo defaults to `CycloneDDS` for
+> development. `Zenoh` remains a field-evaluation path until measured against
+> the real topic mix, operator video load, and ArduPilot transport path.
+
 ---
 
 ## Is Zenoh Standard?
@@ -27,7 +32,7 @@ Academic research converges on a **3-layer communication pattern**:
 
 | Layer | Protocol | Purpose |
 |---|---|---|
-| Vehicle ↔ Flight controller | MAVLink / uXRCE-DDS | PX4 autopilot control |
+| Vehicle ↔ Flight controller | AP_DDS / MAVROS / MAVLink | ArduPilot autopilot control |
 | Inter-drone coordination | ROS 2 DDS (FastDDS or CycloneDDS) | Swarm topics and actions |
 | Ground station relay | MQTT bridge or same DDS | Cloud or GCS connectivity |
 
@@ -198,11 +203,21 @@ Small, inexpensive, and the difference between a lost drone and a recovered one.
 
 | Scenario | Recommendation |
 |---|---|
-| Simulation (all phases) | Zenoh in peer-to-peer mode, no router needed |
-| Early hardware testing (<100m) | Standard companion computer WiFi, Zenoh |
-| Field operations (100–400m) | External high-gain USB WiFi adapter, Zenoh router on ThinkPad |
+| Simulation (current repo) | CycloneDDS default, Zenoh optional |
+| Early hardware testing (<100m) | Standard companion computer WiFi, CycloneDDS baseline and Zenoh comparison runs |
+| Field operations (100–400m) | External high-gain USB WiFi adapter, benchmark both DDS and Zenoh against control + video workload |
 | Extended operations (>400m) | Doodle Labs Mesh Rider radios + LoRa fallback |
 
-Zenoh is the right choice for this project: the swarm topology changes constantly as drones fly, Zenoh handles dynamic membership far better than DDS, and starting fresh means there is no legacy compatibility cost. The 97–99% discovery overhead reduction directly supports the bandwidth-segmented architecture already designed into the system.
+Practical repo recommendation:
+
+- Keep `CycloneDDS` as the development default because it is the current stable,
+  working path in this repository.
+- Keep `Zenoh` available for controlled evaluation because ROS 2 supports it and
+  it may reduce discovery overhead in constrained networks.
+- Do not declare a field winner until you measure:
+  operator-selected video stream stability
+  swarm command latency
+  topic discovery behavior
+  AP_DDS / Micro XRCE-DDS coexistence on the target network
 
 **Comparison reference:** Comparison of DDS, MQTT, and Zenoh in Edge-to-Edge/Cloud Communication with ROS 2 — https://arxiv.org/abs/2309.07496
