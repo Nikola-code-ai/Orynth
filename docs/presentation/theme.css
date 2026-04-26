@@ -1,0 +1,353 @@
+/* =========================================================================
+   Orynth · AeroLab presentation theme
+   Dark monochrome with a single accent, inspired by the Orynth banner
+   (ink-on-paper B&W) inverted for projected display.
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --ink:        #f4f1ea;   /* paper-white text */
+  --ink-dim:    #9a958a;
+  --ink-faint:  #5c584f;
+  --bg:         #0a0a0b;
+  --bg-raised:  #131316;
+  --rule:       #2a2a2e;
+  --accent:     #d98f3a;   /* warm copper — aviation blueprint feel */
+  --accent-dim: #8a5a21;
+  --ok:         #7fb27f;
+  --warn:       #d9c33a;
+}
+
+/* ---- reveal overrides ---- */
+.reveal {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-weight: 400;
+  font-size: 30px;
+  color: var(--ink);
+  background: var(--bg);
+  letter-spacing: 0.005em;
+}
+
+.reveal .slides {
+  text-align: left;
+}
+
+.reveal .slides section,
+.reveal .slides section > section {
+  padding: 10px 0;
+  height: auto;
+}
+
+/* ---- headings ---- */
+.reveal h1, .reveal h2, .reveal h3, .reveal h4, .reveal h5 {
+  font-family: 'Inter', sans-serif;
+  color: var(--ink);
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin: 0 0 0.4em 0;
+}
+
+.reveal h1 { font-size: 2.8em; font-weight: 800; letter-spacing: -0.02em; }
+.reveal h2 { font-size: 1.6em; font-weight: 700; }
+.reveal h3 { font-size: 1.15em; font-weight: 600; color: var(--ink); }
+.reveal h4 { font-size: 0.9em; font-weight: 600; color: var(--ink-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+
+.reveal p, .reveal li {
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+/* ---- eyebrow / kicker text ---- */
+.kicker {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55em;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 1.2em;
+  display: block;
+}
+
+/* ---- horizontal rules ---- */
+.reveal hr, .rule {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 0.8em 0;
+}
+
+.accent-rule {
+  border: 0;
+  border-top: 2px solid var(--accent);
+  width: 60px;
+  margin: 0.6em 0 1em 0;
+}
+
+/* ---- code ---- */
+.reveal pre,
+.reveal code {
+  font-family: 'JetBrains Mono', monospace;
+}
+.reveal pre {
+  font-size: 0.52em;
+  line-height: 1.45;
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 0.7em 1em;
+  box-shadow: none;
+  width: 100%;
+}
+.reveal pre code {
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+  max-height: none;
+}
+.reveal code.inline,
+.reveal :not(pre) > code {
+  background: var(--bg-raised);
+  color: var(--accent);
+  padding: 0.08em 0.35em;
+  border-radius: 3px;
+  font-size: 0.85em;
+}
+
+/* ---- lists ---- */
+.reveal ul, .reveal ol {
+  margin-left: 1em;
+}
+.reveal ul li, .reveal ol li {
+  margin: 0.25em 0;
+}
+.reveal ul { list-style: none; margin-left: 0; padding-left: 0; }
+.reveal ul li { position: relative; padding-left: 1.3em; }
+.reveal ul li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.6em;
+  width: 0.55em;
+  height: 1px;
+  background: var(--accent);
+}
+
+/* ---- tables ---- */
+.reveal table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75em;
+  margin: 0.4em 0;
+}
+.reveal table th {
+  text-align: left;
+  border-bottom: 1px solid var(--accent);
+  padding: 0.4em 0.8em 0.4em 0;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: uppercase;
+  font-size: 0.78em;
+  letter-spacing: 0.08em;
+}
+.reveal table td {
+  border-bottom: 1px solid var(--rule);
+  padding: 0.45em 0.8em 0.45em 0;
+  vertical-align: top;
+}
+.reveal table tr:last-child td { border-bottom: none; }
+
+/* ---- layout helpers ---- */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2em;
+  align-items: start;
+}
+.two-col-40-60 {
+  display: grid;
+  grid-template-columns: 40% 60%;
+  gap: 2em;
+  align-items: start;
+}
+.three-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 1.5em;
+  align-items: start;
+}
+
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-left: 2px solid var(--accent);
+  padding: 1em 1.2em;
+  border-radius: 2px;
+}
+.card h3 { margin-top: 0; font-size: 0.95em; }
+.card p, .card li { font-size: 0.85em; color: var(--ink-dim); }
+
+/* ---- status pills ---- */
+.pill {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55em;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0.25em 0.7em;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+  vertical-align: middle;
+}
+.pill.done    { color: var(--ok); }
+.pill.next    { color: var(--accent); }
+.pill.planned { color: var(--ink-faint); }
+
+/* ---- cover slide ---- */
+.cover {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-start;
+  min-height: 100%;
+  width: 100%;
+  padding: 0 !important;
+}
+.cover .hero {
+  width: 100%;
+  aspect-ratio: 2912 / 1440;
+  background-image: url('assets/banner.png');
+  background-size: cover;
+  background-position: center;
+  filter: contrast(1.05);
+  position: relative;
+}
+.cover .hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(10,10,11,0) 55%, rgba(10,10,11,0.92) 100%);
+}
+.cover .meta {
+  padding: 1.5em 0 0.5em 0;
+  width: 100%;
+}
+.cover h1 {
+  font-size: 2.2em;
+  font-weight: 800;
+  margin-bottom: 0.1em;
+}
+.cover .subtitle {
+  font-size: 0.9em;
+  color: var(--ink-dim);
+  margin-bottom: 1.2em;
+}
+.cover .presenter {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55em;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* ---- section divider ---- */
+.section-divider {
+  text-align: left;
+}
+.section-divider .num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 1em;
+  color: var(--accent);
+  letter-spacing: 0.2em;
+  display: block;
+  margin-bottom: 0.8em;
+}
+.section-divider h1 {
+  font-size: 3.2em;
+  max-width: 80%;
+}
+
+/* ---- ascii-ish diagrams ---- */
+.diagram {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55em;
+  line-height: 1.55;
+  background: var(--bg-raised);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 1.2em 1.4em;
+  white-space: pre;
+  color: var(--ink);
+  overflow-x: auto;
+}
+
+/* ---- footer ---- */
+.slide-footer {
+  position: absolute;
+  bottom: 14px;
+  left: 60px;
+  right: 60px;
+  display: flex;
+  justify-content: space-between;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.42em;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.slide-footer .left  { color: var(--accent-dim); }
+
+/* reveal slide number */
+.reveal .slide-number {
+  background: transparent;
+  color: var(--ink-faint);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9em;
+  right: 24px;
+  bottom: 14px;
+}
+
+/* progress bar */
+.reveal .progress {
+  color: var(--accent);
+  height: 2px;
+}
+
+/* controls */
+.reveal .controls {
+  color: var(--ink-faint);
+}
+
+/* ---- small utilities ---- */
+.muted   { color: var(--ink-dim); }
+.faint   { color: var(--ink-faint); }
+.accent  { color: var(--accent); }
+.mono    { font-family: 'JetBrains Mono', monospace; }
+.small   { font-size: 0.7em; }
+.xs      { font-size: 0.55em; }
+
+.tag {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.55em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  border: 1px solid var(--rule);
+  padding: 0.18em 0.55em;
+  border-radius: 2px;
+  margin: 0 0.25em 0.25em 0;
+}
+
+/* Timeline table specifics */
+.timeline-table td.phase { font-family: 'JetBrains Mono', monospace; color: var(--accent); font-weight: 600; width: 12%; }
+.timeline-table td.status { width: 14%; }
+.timeline-table td.focus  { width: 30%; font-weight: 600; }
+
+.reveal section img {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  margin: 0;
+}

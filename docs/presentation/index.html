@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orynth · AeroLab — Phase 1 Review</title>
+
+  <link rel="stylesheet" href="vendor/reveal.js/dist/reset.css" />
+  <link rel="stylesheet" href="vendor/reveal.js/dist/reveal.css" />
+  <link rel="stylesheet" href="vendor/reveal.js/dist/theme/black.css" id="theme" />
+  <link rel="stylesheet" href="vendor/reveal.js/plugin/highlight/monokai.css" id="highlight-theme" />
+  <link rel="stylesheet" href="theme.css" />
+</head>
+<body>
+
+<div class="reveal">
+  <div class="slides">
+
+    <!-- ========================================================== -->
+    <!-- 1. COVER                                                     -->
+    <!-- ========================================================== -->
+    <section class="cover" data-background-color="#0a0a0b">
+      <div class="hero"></div>
+      <div class="meta" style="padding: 1.5em 60px 0.5em 60px;">
+        <span class="presenter">Orynth · AeroLab Programme</span>
+        <h1 style="margin-top: 0.2em;">AeroLab Swarm Architecture</h1>
+        <div class="subtitle">Phase 1 · Status Review &amp; Implementation Timeline</div>
+        <div class="mono xs muted" style="margin-top: 0.4em;">Nikola Markovic &middot; April 2026</div>
+      </div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 2. MISSION STATEMENT                                         -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">01 · Mission</span>
+      <h1 style="font-size: 2.2em; max-width: 85%;">
+        An autonomous 5-drone swarm &mdash;<br/>
+        <span class="muted">simulated today, flying tomorrow.</span>
+      </h1>
+      <hr class="accent-rule" />
+      <div class="two-col" style="margin-top: 1.5em;">
+        <div>
+          <h4>What We Are Building</h4>
+          <p>A containerised, full-stack swarm system for coordinated perception, real-time mapping, and adaptive mission execution. Architecture splits cleanly between intelligence (Mothership) and edge sensing (Support Fleet).</p>
+        </div>
+        <div>
+          <h4>Why This Way</h4>
+          <p>Radio bandwidth is the hard constraint in any real outdoor swarm. The system is designed from day one to segment traffic by role, so heavy payloads (LiDAR, 4K optics) never saturate the shared RF channel.</p>
+        </div>
+      </div>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>01 — MISSION</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 3. AGENDA                                                    -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">Agenda</span>
+      <h2>What we'll cover</h2>
+      <hr class="accent-rule" />
+      <table style="margin-top: 1em; font-size: 0.85em;">
+        <tbody>
+          <tr><td class="mono accent" style="width: 10%;">01</td><td>Swarm doctrine &mdash; Mothership &amp; Support Fleet</td></tr>
+          <tr><td class="mono accent">02</td><td>Target system architecture &amp; tech stack</td></tr>
+          <tr><td class="mono accent">03</td><td>Per-drone Aerostack2 stack &mdash; how one drone is wired</td></tr>
+          <tr><td class="mono accent">04</td><td>Phase 1 &mdash; what's in the repo right now</td></tr>
+          <tr><td class="mono accent">05</td><td>Running the simulation &mdash; teleop and automated modes</td></tr>
+          <tr><td class="mono accent">06</td><td>Seven-phase implementation timeline</td></tr>
+          <tr><td class="mono accent">07</td><td>Risks, open questions, next steps</td></tr>
+        </tbody>
+      </table>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>AGENDA</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 4. DOCTRINE                                                  -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">02 · Swarm Doctrine</span>
+      <h2>Mothership &amp; Support Fleet</h2>
+      <hr class="accent-rule" />
+      <div class="two-col" style="margin-top: 1em;">
+        <div class="card">
+          <h3><span class="accent mono">DRONE 0</span> &nbsp;&middot;&nbsp; Mothership</h3>
+          <ul>
+            <li>Central routing hub &amp; RF gateway</li>
+            <li>Global path planner</li>
+            <li>LiDAR aggregator / map builder</li>
+            <li>Command relay to ground station</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3><span class="accent mono">DRONES 1&ndash;4</span> &nbsp;&middot;&nbsp; Support Fleet</h3>
+          <ul>
+            <li>Decentralised edge workers</li>
+            <li>Configurable onboard detection per node</li>
+            <li>Local localisation &amp; sensor redundancy</li>
+            <li>Formation-keeping around the Mothership</li>
+          </ul>
+        </div>
+      </div>
+      <p class="small muted" style="margin-top: 1.4em;">
+        <span class="accent mono xs">WHY ASYMMETRIC&nbsp;&rarr;</span>
+        The Mothership owns intelligence and aggregation. The Support Fleet owns
+        sensing and redundancy. Segmenting roles keeps uplink bandwidth to the
+        ground station inside a practical WiFi envelope.
+      </p>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>02 — DOCTRINE</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 5. TARGET ARCHITECTURE                                       -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">03 · Target Architecture</span>
+      <h2>System topology</h2>
+      <hr class="accent-rule" />
+<pre class="diagram" style="font-size: 0.5em;">
+┌─────────────────────────────────────────────────────────────────┐
+│                        GROUND STATION                           │
+│    Mission Planner · Fleet Monitor · Map Viewer · Data Store    │
+│                     (Laptop / ThinkPad)                         │
+└────────────────────────┬────────────────────────────────────────┘
+                         │ Zenoh mesh
+         ┌───────────────┴───────────────┐
+         ▼                               ▼
+┌─────────────────┐           ┌─────────────────────────────────┐
+│   MOTHERSHIP    │           │         SUPPORT FLEET           │
+│    (Drone 0)    │◄──────────│      (Drones 1 – 4)             │
+│                 │           │                                 │
+│ • Path planning │           │ • Onboard detection             │
+│ • LiDAR fusion  │           │ • Local localisation            │
+│ • Map building  │           │ • Formation keeping             │
+│ • RF routing    │           │ • Sensor redundancy             │
+│ • Command relay │           │ • Visual servoing               │
+└─────────────────┘           └─────────────────────────────────┘
+</pre>
+      <p class="small muted" style="margin-top: 0.8em;">
+        Identical Aerostack2 stack on every node; role differentiation is
+        configuration and orchestration, not forked code.
+      </p>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>03 — ARCHITECTURE</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 6. TECH STACK                                                -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">03 · Tech Stack</span>
+      <h2>The building blocks</h2>
+      <hr class="accent-rule" />
+      <table>
+        <thead>
+          <tr><th style="width: 22%;">Layer</th><th>Technology</th><th style="width: 32%;">Role</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="mono muted">OS</td>               <td>Ubuntu 22.04 LTS</td><td class="muted small">Host &amp; container base</td></tr>
+          <tr><td class="mono muted">Middleware</td>       <td>ROS&nbsp;2 Humble</td><td class="muted small">Topic / service / action graph</td></tr>
+          <tr><td class="mono muted">Swarm framework</td>  <td>Aerostack2 (nightly-humble)</td><td class="muted small">Behaviours, platform abstraction</td></tr>
+          <tr><td class="mono muted">Simulation</td>       <td>Ignition Gazebo Fortress</td><td class="muted small">Physics &amp; sensor sim</td></tr>
+          <tr><td class="mono muted">Transport</td>        <td>CycloneDDS &nbsp;/&nbsp; Zenoh</td><td class="muted small">Runtime-selectable RMW</td></tr>
+          <tr><td class="mono muted">Edge AI</td>          <td>PyTorch + configurable detector runtime</td><td class="muted small">Per-drone inference</td></tr>
+          <tr><td class="mono muted">Container</td>        <td>Docker + docker compose</td><td class="muted small">Reproducible dev &amp; deploy</td></tr>
+          <tr><td class="mono muted">Autopilot (Ph.7)</td> <td>ArduPilot-compatible FCU</td><td class="muted small">Flight control when we go to hardware</td></tr>
+        </tbody>
+      </table>
+      <p class="small muted" style="margin-top: 0.9em;">
+        Base image <code class="inline">aerostack2/nightly-humble</code> already ships ROS&nbsp;2 + AS2
+        + Ignition compiled &mdash; we layer only the AI and transport deltas.
+      </p>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>03 — STACK</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 7. PER-DRONE STACK                                           -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">03 · Per-Drone Stack</span>
+      <h2>Inside one namespace <span class="muted mono" style="font-size: 0.55em;">/droneN</span></h2>
+      <hr class="accent-rule" />
+      <div class="two-col-40-60" style="margin-top: 0.8em;">
+<pre class="diagram" style="font-size: 0.48em; margin: 0;">
+ Gazebo physics
+      ↕  ros_gz_bridge
+ drone_bridges
+      ↕
+ as2_platform_gazebo
+      ↕
+ as2_state_estimator
+      ↕
+ as2_motion_controller
+      ↕
+ as2_behaviors_motion
+   · TakeoffBehavior
+   · GoToBehavior
+   · LandBehavior
+   · FollowPathBehavior
+   · FollowReferenceBehavior
+</pre>
+        <div>
+          <h4>What each layer does</h4>
+          <table style="font-size: 0.62em;">
+            <tbody>
+              <tr><td class="mono accent">bridges</td><td>Gazebo ↔ ROS&nbsp;2 (ground truth, cmd_vel, arm, IMU)</td></tr>
+              <tr><td class="mono accent">platform</td><td>Translates actuator cmds to the sim; ArduPilot is a separate future backend</td></tr>
+              <tr><td class="mono accent">estimator</td><td>Publishes pose + TF chain <code class="inline">earth → map → odom → base_link</code></td></tr>
+              <tr><td class="mono accent">controller</td><td>PID: motion reference → velocity setpoints</td></tr>
+              <tr><td class="mono accent">behaviors</td><td>Action servers for high-level primitives</td></tr>
+            </tbody>
+          </table>
+          <p class="xs muted" style="margin-top: 0.9em;">
+            Every drone runs an identical copy of this stack. Co-ordination is a
+            separate <em>orchestrator</em> node that sends goals to all five via
+            their namespaced action servers.
+          </p>
+        </div>
+      </div>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>03 — PER-DRONE</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 8. PHASE 1 — STATUS                                          -->
+    <!-- ========================================================== -->
+    <section class="section-divider">
+      <span class="num">PHASE 01</span>
+      <h1>What's in the repo <span class="accent">right now</span>.</h1>
+      <hr class="accent-rule" style="width: 120px; border-top-width: 3px;" />
+      <p class="muted" style="font-size: 0.9em; max-width: 70%; margin-top: 1em;">
+        Simulation foundation &mdash; the first milestone is complete.
+        Full 5-drone sim, teleop, and formation flying are operational end-to-end.
+      </p>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>PHASE 01 — DONE</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 9. PHASE 1 DELIVERABLES                                      -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">04 · Phase 1 Deliverables</span>
+      <h2>Five things that work today <span class="pill done">Complete</span></h2>
+      <hr class="accent-rule" />
+      <div class="two-col" style="margin-top: 1em; gap: 1.5em;">
+        <div class="card">
+          <h3 class="accent mono">01 · Containerised environment</h3>
+          <p>Dockerfile extends <code class="inline">aerostack2/nightly-humble</code>. Adds PyTorch, Ultralytics,
+          OpenCV-headless and both RMWs (CycloneDDS + Zenoh). GPU + X11 passthrough for Gazebo rendering.
+          Build time: <span class="accent">~3&ndash;5 min</span>.</p>
+        </div>
+        <div class="card">
+          <h3 class="accent mono">02 · One-command swarm bringup</h3>
+          <p><code class="inline">swarm_bringup_launch.py</code> starts the Gazebo world and all five drone stacks
+          in a single command. Each stack: bridges, platform, estimator, controller, five behaviour action servers.</p>
+        </div>
+        <div class="card">
+          <h3 class="accent mono">03 · Teleoperation mode</h3>
+          <p>Keyboard GUI controls drone0. Drones 1&ndash;4 follow in real-time diamond formation via
+          <code class="inline">FollowReferenceBehavior</code> tracking <code class="inline">drone0/base_link</code>.</p>
+        </div>
+        <div class="card">
+          <h3 class="accent mono">04 · Automated formation mode</h3>
+          <p><code class="inline">flock_orchestrator</code> arms, offboards, and takes off all five drones in parallel threads,
+          then attaches the FollowReference module on drones 1&ndash;4. No polling loop.</p>
+        </div>
+      </div>
+      <div class="card" style="margin-top: 1em;">
+        <h3 class="accent mono">05 · Validation test + dual-RMW support</h3>
+        <p><code class="inline">mission_test.py</code> flies drone0 through a waypoint and asserts followers
+        hold their offsets within 0.5&nbsp;m. <code class="inline">rmw:=zenoh</code> argument swaps middleware at
+        launch &mdash; includes router startup, session config, and a <code class="inline">tf_static</code> replay workaround.</p>
+      </div>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>04 — DELIVERABLES</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 10. REPO LAYOUT                                              -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">04 · Repository Layout</span>
+      <h2>Where to find things</h2>
+      <hr class="accent-rule" />
+<pre class="diagram" style="font-size: 0.48em;">
+aerolab_ws/
+├── Dockerfile                 · FROM aerostack2/nightly-humble + AI deps + RMWs
+├── docker-compose.yml         · GPU, X11, shm_size=2gb, volume-mounts src/
+├── entrypoint.sh              · Sources ROS2 + AS2 + workspace on shell start
+├── docs/                      · project_roadmap · project_reference · simulation_guide · network_research
+└── src/
+    └── aerolab_simulation/
+        ├── launch/
+        │   ├── swarm_bringup_launch.py     · Master launch — world + 5 stacks + optional orchestrator
+        │   ├── swarm_gazebo_launch.py      · Gazebo world + model spawning only
+        │   ├── drone_stack_launch.py       · Per-drone: bridges + AS2 nodes (reused × 5)
+        │   └── teleop_launch.py            · as2_keyboard_teleoperation wrapper
+        ├── aerolab_simulation/
+        │   ├── flock_orchestrator.py       · Swarm takeoff + FollowReference choreography
+        │   └── tf_static_bridge.py         · Zenoh /tf_static replay workaround
+        ├── config/                         · platform_gz · state_estimator · motion_controller · behaviors · zenoh_*
+        ├── resource/swarm_config.json      · 5 quadrotors, spawn positions
+        └── scripts/mission_test.py         · Phase 1 validation — waypoint + formation check
+</pre>
+      <p class="xs muted" style="margin-top: 0.8em;">
+        <code class="inline">src/aerolab_perception/</code> is an empty placeholder &mdash; it will be
+        populated in Phase 4.
+      </p>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>04 — REPO</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 11. ONE-COMMAND BRINGUP                                      -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">05 · Launch Pipeline</span>
+      <h2>One command, 15 seconds, 5 drones airborne-ready</h2>
+      <hr class="accent-rule" />
+      <div class="two-col" style="gap: 2em; margin-top: 0.5em;">
+        <div>
+          <h4>CycloneDDS (default)</h4>
+<pre class="diagram" style="font-size: 0.55em;">
+t = 0 s   Gazebo world + 5 models spawn
+t = 6 s   Per-drone stacks ×5 in parallel
+          ├── drone_bridges
+          ├── platform_gazebo
+          ├── state_estimator
+          ├── motion_controller
+          └── 5 × behavior servers
+t = 10 s  flock_orchestrator  (if enabled)
+</pre>
+        </div>
+        <div>
+          <h4>Zenoh (opt-in)</h4>
+<pre class="diagram" style="font-size: 0.55em;">
+t = 0 s   zenoh_router daemon
+t = 3 s   Gazebo world + 5 models
+t = 11 s  tf_static_bridge (QoS workaround)
+t = 12 s  Per-drone stacks ×5 in parallel
+t = 16 s  flock_orchestrator  (if enabled)
+</pre>
+        </div>
+      </div>
+      <p class="xs muted" style="margin-top: 0.8em;">
+        Timer offsets are tuned so action servers are discoverable before
+        orchestrators try to talk to them &mdash; the kind of detail that makes
+        scaling to more drones predictable.
+      </p>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>05 — LAUNCH</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 12. TWO OPERATING MODES                                      -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">05 · Operating Modes</span>
+      <h2>Two ways to fly the swarm</h2>
+      <hr class="accent-rule" />
+      <div class="two-col" style="margin-top: 0.8em;">
+        <div>
+          <h3><span class="mono accent">MODE A</span> &nbsp; Teleoperation</h3>
+          <p class="small muted">Manual control of drone0. Drones 1&ndash;4 track it.</p>
+<pre><code class="language-bash" data-trim>
+# Terminal 1 — full stack
+ros2 launch aerolab_simulation \
+  swarm_bringup_launch.py
+
+# Terminal 2 — takeoff + formation
+ros2 run aerolab_simulation \
+  flock_orchestrator
+
+# Terminal 3 — keyboard GUI
+ros2 launch aerolab_simulation \
+  teleop_launch.py
+</code></pre>
+        </div>
+        <div>
+          <h3><span class="mono accent">MODE B</span> &nbsp; Automated</h3>
+          <p class="small muted">Full bringup + formation in one command.</p>
+<pre><code class="language-bash" data-trim>
+# One terminal
+ros2 launch aerolab_simulation \
+  swarm_bringup_launch.py \
+  use_flock_orchestrator:=true
+
+# Optional — attach keyboard teleop
+ros2 launch aerolab_simulation \
+  teleop_launch.py
+</code></pre>
+          <p class="xs muted" style="margin-top: 0.6em;">
+            Mode B is the one-click demo. Mode A is the debug workflow &mdash;
+            each terminal stays attached to one component's log stream.
+          </p>
+        </div>
+      </div>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>05 — MODES</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 13. DIAMOND FORMATION                                        -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">05 · Formation Geometry</span>
+      <h2>Diamond formation</h2>
+      <hr class="accent-rule" />
+      <div class="two-col" style="margin-top: 0.5em;">
+<pre class="diagram" style="font-size: 0.6em;">
+          drone1   (+3m forward)
+              ▲
+              │
+ drone2 ─── drone0 ─── drone3
+(+3m L)   (leader)    (-3m L)
+              │
+              ▼
+          drone4   (-3m forward)
+</pre>
+        <div>
+          <h4>How it holds</h4>
+          <ul>
+            <li>Followers run <code class="inline">FollowReferenceBehavior</code> with <br/>
+            <code class="inline">frame_id = "drone0/base_link"</code></li>
+            <li>Offsets are in drone0's <strong>FLU body frame</strong>&nbsp;&mdash; rotation-aware</li>
+            <li>TF updates propagate every control cycle</li>
+            <li>No polling loop in the orchestrator &mdash; fire-and-forget goal</li>
+          </ul>
+          <p class="xs muted" style="margin-top: 0.6em;">
+            Formation shape is data. Swapping to a V, a line, or a circle is
+            just changing the offset table &mdash; no new code path.
+          </p>
+        </div>
+      </div>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>05 — FORMATION</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 14. TIMELINE SECTION DIVIDER                                 -->
+    <!-- ========================================================== -->
+    <section class="section-divider">
+      <span class="num">PHASES 02 – 07</span>
+      <h1>The <span class="accent">implementation timeline.</span></h1>
+      <hr class="accent-rule" style="width: 120px; border-top-width: 3px;" />
+      <p class="muted" style="font-size: 0.9em; max-width: 70%; margin-top: 1em;">
+        Six more phases, each adding one complete capability layer on top of the
+        simulation foundation. Hardware transition is deliberately last.
+      </p>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>TIMELINE</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 15. TIMELINE AT A GLANCE                                     -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">06 · Timeline</span>
+      <h2>Seven phases, one capability at a time</h2>
+      <hr class="accent-rule" />
+      <table class="timeline-table" style="margin-top: 0.6em;">
+        <thead>
+          <tr><th>Phase</th><th>Focus</th><th>Key Deliverable</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="phase">01</td>
+            <td class="focus">Simulation foundation</td>
+            <td class="small">5 drones airborne, teleop, diamond formation, mission-test script</td>
+            <td class="status"><span class="pill done">Done</span></td>
+          </tr>
+          <tr>
+            <td class="phase">02</td>
+            <td class="focus">Ground control station</td>
+            <td class="small">Foxglove GCS · swarm + per-drone panels · detector overlay</td>
+            <td class="status"><span class="pill next">Next</span></td>
+          </tr>
+          <tr>
+            <td class="phase">03</td>
+            <td class="focus">Swarm behaviour &amp; command layer</td>
+            <td class="small">Formation library · state model · collision handling · shared command API</td>
+            <td class="status"><span class="pill planned">Planned</span></td>
+          </tr>
+          <tr>
+            <td class="phase">04</td>
+            <td class="focus">ArduPilot SITL bootstrap</td>
+            <td class="small">Early AP_DDS validation · single-vehicle parity on the real-flight path</td>
+            <td class="status"><span class="pill planned">Planned</span></td>
+          </tr>
+          <tr>
+            <td class="phase">05</td>
+            <td class="focus">Perception pipeline</td>
+            <td class="small">Onboard detection per drone · multi-drone fusion · distance validation</td>
+            <td class="status"><span class="pill planned">Planned</span></td>
+          </tr>
+          <tr>
+            <td class="phase">06</td>
+            <td class="focus">Mission autonomy &amp; mapping</td>
+            <td class="small">BT missions · semantic 3D map · search / survey autonomy</td>
+            <td class="status"><span class="pill planned">Planned</span></td>
+          </tr>
+          <tr>
+            <td class="phase">07</td>
+            <td class="focus">Hardware transition</td>
+            <td class="small">ArduPilot FCU · HIL testing · first outdoor 2-drone formation</td>
+            <td class="status"><span class="pill planned">Planned</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="xs muted" style="margin-top: 0.8em;">
+        Each phase ends in a demo you can run. Hardware comes last by design
+        &mdash; we don't fly anything that hasn't been proven in sim first.
+      </p>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>06 — TIMELINE</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 16. PHASE 2 DETAIL                                           -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">Phase 02 &middot; Ground Control Station</span>
+      <h2>Foxglove on the ThinkPad <span class="pill next">Next</span></h2>
+      <hr class="accent-rule" />
+      <div class="two-col" style="margin-top: 0.6em;">
+        <div>
+          <h4>Goal</h4>
+          <p class="small">Operator has total situational awareness and can command the swarm &mdash;
+          or any individual drone &mdash; at any time from the ground station.</p>
+
+          <h4 style="margin-top: 0.8em;">Work</h4>
+          <ul class="small">
+            <li>Foxglove Studio + WebSocket bridge</li>
+            <li>3D swarm view &mdash; five live poses + trajectories</li>
+            <li>Swarm command panel (takeoff / form / RTL)</li>
+            <li>Per-drone waypoint panel via shared command interface</li>
+            <li>Camera feed + detector overlay (live annotation)</li>
+            <li>Bandwidth manager node on the Mothership</li>
+          </ul>
+        </div>
+        <div>
+          <h4>Deliverables</h4>
+          <ul class="small">
+            <li><code class="inline">gcs_bringup_launch.py</code></li>
+            <li><code class="inline">bandwidth_manager_node.py</code></li>
+            <li>Foxglove layout (JSON)</li>
+            <li>Custom React panels &mdash; swarm &amp; per-drone</li>
+          </ul>
+          <h4 style="margin-top: 0.8em;">Demo</h4>
+          <p class="small muted">
+            Watch 5 drones in the 3D panel, temporarily take one out of formation
+            for a manual waypoint, return it to formation, see detector overlays on
+            the selected camera feed.
+          </p>
+        </div>
+      </div>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>PHASE 02</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 17. PHASES 3-4 DETAIL                                        -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">Phases 03 &amp; 04</span>
+      <h2>Shared control, then ArduPilot bootstrap</h2>
+      <hr class="accent-rule" />
+      <div class="two-col" style="margin-top: 0.4em;">
+        <div class="card">
+          <h3 class="mono">PHASE 03 &middot; Swarm Behaviour &amp; Command Layer <span class="pill planned" style="margin-left: 0.5em;">Planned</span></h3>
+          <ul class="small">
+            <li>Formation library &mdash; diamond, line, V, circle, search-spread</li>
+            <li>Coordinated transitions without inter-drone collision</li>
+            <li>Collision monitor &mdash; velocity-obstacle or potential-field</li>
+            <li>Swarm state machine: Idle → Takeoff → Form → Mission → Land</li>
+            <li>Drone-dropout handling &mdash; remaining drones rebalance</li>
+            <li>Shared command/status API for UI, missions, and backend adapters</li>
+          </ul>
+          <p class="xs muted">
+            <span class="mono accent">DEMO&nbsp;&rarr;</span> Take off, transition through
+            3 formations, pull one drone out and back in, land &mdash; no hand-holding.
+          </p>
+        </div>
+        <div class="card">
+          <h3 class="mono">PHASE 04 &middot; ArduPilot SITL Bootstrap <span class="pill planned" style="margin-left: 0.5em;">Planned</span></h3>
+          <ul class="small">
+            <li>Separate ArduPilot SITL bringup profile</li>
+            <li>AP_DDS-backed vehicle adapter on the shared mission surface</li>
+            <li>Single-vehicle arm / takeoff / goto / land parity demo</li>
+            <li>Namespace plan for later 2-drone and 5-drone SITL</li>
+            <li>Keep the Gazebo split explicit</li>
+          </ul>
+          <p class="xs muted">
+            <span class="mono accent">TARGET&nbsp;&rarr;</span> same high-level mission
+            commands can drive Aerostack2 sim and one ArduPilot SITL vehicle.
+          </p>
+        </div>
+      </div>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>PHASES 03 – 04</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 18. PHASES 5-7 DETAIL                                        -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">Phases 05 – 07</span>
+      <h2>Perception, autonomy, hardware</h2>
+      <hr class="accent-rule" />
+      <div class="three-col" style="margin-top: 0.4em;">
+        <div class="card">
+          <h3 class="mono">05 · Perception Pipeline</h3>
+          <p class="xs muted">Human detection that survives measurement, not just demos.</p>
+          <ul class="small">
+            <li>Camera payloads on each support drone</li>
+            <li>Perception node per drone &rarr; <code class="inline">DetectionArray</code></li>
+            <li>Ground-station fusion node</li>
+            <li>50&ndash;100 m distance-binned validation</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 class="mono">06 · Mission Autonomy &amp; Mapping</h3>
+          <p class="xs muted">Search or survey behavior that produces a useful map.</p>
+          <ul class="small">
+            <li>BT mission library</li>
+            <li>Search / survey execution and adaptation</li>
+            <li>Mothership LiDAR + multi-drone detections</li>
+            <li>Point cloud registration (ICP / NDT)</li>
+            <li>Semantic 3D map &mdash; objects projected into cloud</li>
+            <li>Store-and-forward relay to GCS</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3 class="mono">07 · Hardware Transition</h3>
+          <p class="xs muted">Same code, real drones.</p>
+          <ul class="small">
+            <li>ArduPilot-compatible FCU + companion SBC per drone</li>
+            <li>Separate ArduPilot bringup path via shared mission interface</li>
+            <li>HIL testing before open-air flight</li>
+            <li>Automated pre-flight check gate</li>
+            <li>First outdoor flight: 2-drone formation, 30 s</li>
+          </ul>
+        </div>
+      </div>
+      <p class="xs muted" style="margin-top: 0.8em;">
+        Moving to hardware keeps the mission layer recognizable, but the
+        ArduPilot SITL and hardware path should be introduced as a separate
+        backend rather than implied by a one-line platform swap.
+      </p>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>PHASES 05 – 07</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 19. RISKS / OPEN QUESTIONS                                   -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">07 · Risks &amp; Open Questions</span>
+      <h2>What I'd like input on</h2>
+      <hr class="accent-rule" />
+      <table style="margin-top: 0.4em; font-size: 0.8em;">
+        <thead>
+          <tr><th style="width: 22%;">Area</th><th>Concern</th><th style="width: 30%;">Options on the table</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono accent">Ultralytics</td>
+            <td>Ultralytics runtime licensing must be reviewed before distributing closed-source binaries.</td>
+            <td class="small">(a) Enterprise licence &mdash; (b) export to ONNX &amp; run under Apache-licensed runtime</td>
+          </tr>
+          <tr>
+            <td class="mono accent">Zenoh maturity</td>
+            <td>Best-on-paper for mesh topologies, QL-2 not QL-1. Smaller ecosystem than DDS.</td>
+            <td class="small">Keep dual-RMW. CycloneDDS default for now, Zenoh opt-in and validated in parallel.</td>
+          </tr>
+          <tr>
+            <td class="mono accent">RF range</td>
+            <td>200&ndash;400 m with companion WiFi. Beyond that we need mesh radios.</td>
+            <td class="small">Early hardware uses WiFi. Doodle Labs / Silvus budgeted from Phase 7 onwards.</td>
+          </tr>
+          <tr>
+            <td class="mono accent">ArduPilot transition</td>
+            <td>ArduPilot SITL should be introduced as a separate path, not implied by the current AS2 simulation stack.</td>
+            <td class="small">Stay AS2-only in sim. Add ArduPilot SITL and hardware through the shared adapter boundary.</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>07 — RISKS</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 20. NEXT STEPS + Q&A                                         -->
+    <!-- ========================================================== -->
+    <section>
+      <span class="kicker">07 · Next Steps</span>
+      <h2>Phase 2 kickoff &mdash; what lands in the next two sprints</h2>
+      <hr class="accent-rule" />
+      <div class="two-col" style="margin-top: 0.6em;">
+        <div>
+          <h4>Sprint N</h4>
+          <ul class="small">
+            <li>Foxglove Studio installed on the ThinkPad</li>
+            <li>Foxglove WebSocket bridge in a new <code class="inline">gcs_bringup_launch.py</code></li>
+            <li>3D panel wired to the five <code class="inline">self_localization/pose</code> topics</li>
+            <li>Pre-built layout checked into <code class="inline">src/aerolab_gcs/layouts/</code></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Sprint N+1</h4>
+          <ul class="small">
+            <li>Swarm command panel &mdash; takeoff / form / land / RTL</li>
+            <li>Per-drone waypoint panel calling <code class="inline">GoToBehavior</code></li>
+            <li>Camera feed slot ready for Phase 4 images</li>
+            <li>Bandwidth manager stub on the Mothership</li>
+          </ul>
+        </div>
+      </div>
+
+      <hr style="margin-top: 1.4em;" />
+      <div class="two-col" style="margin-top: 0.8em;">
+        <div>
+          <h4>Repo entry points</h4>
+          <ul class="small mono">
+            <li>README.md</li>
+            <li>docs/project_roadmap.md</li>
+            <li>docs/simulation_guide.md</li>
+            <li>docs/project_reference.md</li>
+            <li>docs/network_research.md</li>
+          </ul>
+        </div>
+        <div>
+          <h4>To get flying locally</h4>
+<pre class="small" style="font-size: 0.55em;"><code class="language-bash" data-trim>
+docker compose build aerolab
+xhost +local:root
+docker compose run --rm aerolab
+# inside container:
+ros2 launch aerolab_simulation \
+  swarm_bringup_launch.py \
+  use_flock_orchestrator:=true
+</code></pre>
+        </div>
+      </div>
+      <div class="slide-footer"><span class="left">ORYNTH / AEROLAB</span><span>NEXT</span></div>
+    </section>
+
+    <!-- ========================================================== -->
+    <!-- 21. THANKS                                                   -->
+    <!-- ========================================================== -->
+    <section data-background-color="#0a0a0b" style="text-align: center; height: 100%;">
+      <div style="padding-top: 20vh;">
+        <span class="kicker" style="display: block; text-align: center;">Orynth · AeroLab</span>
+        <h1 style="font-size: 3.4em; text-align: center;">Questions.</h1>
+        <hr class="accent-rule" style="margin: 1em auto;" />
+        <p class="muted" style="text-align: center; font-size: 0.75em; max-width: 60%; margin: 1em auto 0;">
+          Repository walk-through, architecture discussion, or anything about
+          where Phase 2 onwards is heading &mdash; the floor is open.
+        </p>
+        <p class="mono xs faint" style="text-align: center; margin-top: 3em;">
+          NIKOLA MARKOVIC · APRIL 2026
+        </p>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script src="vendor/reveal.js/dist/reveal.js"></script>
+<script src="vendor/reveal.js/plugin/highlight/highlight.js"></script>
+<script src="vendor/reveal.js/plugin/notes/notes.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    slideNumber: 'c/t',
+    controls: true,
+    progress: true,
+    center: false,
+    transition: 'fade',
+    transitionSpeed: 'fast',
+    backgroundTransition: 'fade',
+    width:  1280,
+    height: 800,
+    margin: 0.06,
+    minScale: 0.2,
+    maxScale: 2.0,
+    plugins: [ RevealHighlight, RevealNotes ]
+  });
+</script>
+
+</body>
+</html>
