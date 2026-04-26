@@ -30,9 +30,8 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchContext, LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch_ros.substitutions import FindPackageShare
 
 
 def launch_drone_stack(context: LaunchContext, *args, **kwargs):
@@ -68,14 +67,13 @@ def launch_drone_stack(context: LaunchContext, *args, **kwargs):
     #   3. arm bridge:      ROS2 /gz/droneN/arm → Gazebo arm topic
     #   4. IMU bridge:      Gazebo IMU sensor → ROS2 sensor_measurements/imu
     #
-    # drone_bridges.py reads swarm_config.json to know which sensors each drone
-    # model has and creates the appropriate bridge nodes automatically.
+    # We use the local bridge launcher instead of the upstream
+    # as2_gazebo_assets launcher because Gazebo TF pose bridges conflict with
+    # the AS2 state estimator's own earth->map->odom->base_link TF chain.
     drone_bridges = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            PathJoinSubstitution([
-                FindPackageShare('as2_gazebo_assets'), 'launch', 'drone_bridges.py'
-            ])
-        ]),
+        PythonLaunchDescriptionSource(
+            os.path.join(pkg_dir, 'launch', 'drone_bridges_launch.py')
+        ),
         launch_arguments={
             'simulation_config_file': config_file,
             'namespace': namespace,

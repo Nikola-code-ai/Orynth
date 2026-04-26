@@ -73,7 +73,7 @@ The Gazebo↔ROS2 bridges are launched per-drone alongside the node stack.
 A Dockerfile extending `aerostack2/nightly-humble` with PyTorch, OpenCV (headless), and both middleware options already installed. The container exposes your GPU and X11 display for Gazebo rendering.
 
 ### 2. One-Command Swarm Bringup
-`swarm_bringup_launch.py` starts the Gazebo world and all 5 drone stacks in a single command (plus the Zenoh router when `rmw:=zenoh`). Each stack includes the Gazebo bridges, platform node, state estimator, motion controller, and all 5 behavior action servers.
+`swarm_bringup_launch.py` starts the Gazebo world and all 5 drone stacks in a single command (plus the Zenoh router when `rmw:=zenoh`). Each stack includes the local filtered Gazebo bridge launcher, platform node, state estimator, motion controller, and all 5 behavior action servers. The local bridge wrapper keeps Gazebo from publishing a second competing `/tf` tree, so the state estimator remains the single source of flight TF.
 
 ### 3. Teleoperation Mode
 Fly drone0 interactively with a keyboard GUI (`teleop_launch.py`). Drones 1–4 automatically follow in diamond formation.

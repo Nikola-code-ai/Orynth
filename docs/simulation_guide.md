@@ -61,7 +61,7 @@ Each drone runs under its own namespace (`/drone0` through `/drone4`). The full 
 ```
 Gazebo physics
     ↕  (ros_gz_bridge nodes — CRITICAL layer)
-drone_bridges          ← ground_truth_bridge (pose+twist), cmd_vel bridge, arm bridge, IMU bridge
+drone_bridges_launch   ← filtered bridge launcher: ground_truth_bridge, cmd_vel bridge, arm bridge, IMU bridge
     ↕
 as2_platform_gazebo    ← translates actuator commands → Gazebo, exposes sensors
 as2_state_estimator    ← reads ground_truth bridge → publishes pose + TF
@@ -71,7 +71,7 @@ as2_behaviors_motion   ← action servers: TakeOff, GoTo, Land, FollowPath, Foll
 
 ### Drone Bridges
 
-`as2_gazebo_assets/launch/drone_bridges.py` must be launched per drone. It creates the `ros_gz_bridge` nodes that connect Gazebo topics to ROS 2:
+`launch/drone_bridges_launch.py` is launched per drone. It wraps the upstream Aerostack2 bridge definition and filters out the Gazebo `/tf` pose bridges so the state estimator remains the single source of flight TF:
 
 - `ground_truth_bridge` — Gazebo pose + twist → `/{namespace}/self_localization/pose` and `.../twist`
 - `cmd_vel` + `arm` parameter bridges — ROS 2 commands → Gazebo actuators
@@ -245,7 +245,7 @@ integration path when Phase 4 begins:
 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
-| Drones don't move after takeoff | Bridges not started | Verify `drone_stack_launch.py` includes `drone_bridges.py` include |
+| Drones don't move after takeoff | Bridges not started | Verify `drone_stack_launch.py` includes `drone_bridges_launch.py` |
 | State estimator TF errors | Wrong YAML key | `state_estimator.yaml` must use `global_ref_frame: "earth"` |
 | `follow_reference` action not found | FollowReferenceModule not attached | `drone.follow_reference = FollowReferenceModule(drone=drone)` |
 | Second terminal has no ROS nodes visible | Workspace not sourced | Run all three `source` commands (see §2) |

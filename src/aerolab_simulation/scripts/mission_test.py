@@ -25,8 +25,10 @@ Formation offsets match flock_orchestrator.py (must stay in sync):
 
 import sys
 import time
+from math import atan2
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from geometry_msgs.msg import PoseStamped
 
 try:
@@ -47,6 +49,12 @@ WAYPOINT          = [5.0, 0.0, 2.0]
 CRUISE_SPEED      = 1.0
 LAND_SPEED        = 0.3
 AIRBORNE_HEIGHT_M = 0.5    # drone0 height threshold to consider it airborne
+POSE_QOS = QoSProfile(
+    history=HistoryPolicy.KEEP_LAST,
+    depth=5,
+    reliability=ReliabilityPolicy.BEST_EFFORT,
+    durability=DurabilityPolicy.VOLATILE,
+)
 
 
 class FormationVerifier(Node):
@@ -60,7 +68,7 @@ class FormationVerifier(Node):
                 PoseStamped,
                 f'/{ns}/self_localization/pose',
                 lambda msg, name=ns: self.poses.update({name: msg.pose}),
-                10
+                POSE_QOS,
             )
 
     def spin_for(self, seconds: float):
@@ -82,6 +90,14 @@ class FormationVerifier(Node):
         return False
 
 
+def yaw_from_pose(pose) -> float:
+    """Extract planar yaw from a geometry_msgs/Pose."""
+    q = pose.orientation
+    siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
+    cosy_cosp = 1.0 - 2.0 * (q.y * q.y + q.z * q.z)
+    return atan2(siny_cosp, cosy_cosp)
+
+
 def check_formation(verifier: FormationVerifier, stage: str) -> bool:
     verifier.spin_for(1.0)
 
@@ -92,6 +108,7 @@ def check_formation(verifier: FormationVerifier, stage: str) -> bool:
 
     lx = leader_pose.position.x
     ly = leader_pose.position.y
+    leader_yaw = yaw_from_pose(leader_pose)
 
     all_pass = True
     for drone in DIAMOND_FORMATION.offsets:
@@ -106,6 +123,7 @@ def check_formation(verifier: FormationVerifier, stage: str) -> bool:
             drone,
             leader_xy=(lx, ly),
             follower_xy=(follower.position.x, follower.position.y),
+            leader_yaw_rad=leader_yaw,
         )
 
         if dist <= FORMATION_TOLERANCE_M:
@@ -149,8 +167,8 @@ def main():
             sys.exit(1)
         print('[mission_test] TakeOff complete.')
 
-    print('[mission_test] Waiting 3s for formation to stabilise...')
-    time.sleep(3.0)
+    print('[mission_test] Waiting 6s for formation to stabilise...')
+    time.sleep(6.0)
 
     # ── Step 2: Formation check at hover ───────────────────────────────────────
     print('\n[mission_test] Step 2: Formation check at hover')
@@ -168,8 +186,8 @@ def main():
         rclpy.shutdown()
         sys.exit(1)
 
-    print('[mission_test] Waypoint reached. Waiting 3s for formation to catch up...')
-    time.sleep(3.0)
+    print('[mission_test] Waypoint reached. Waiting 8s for formation to catch up...')
+    time.sleep(8.0)
 
     # ── Step 4: Formation check at waypoint ────────────────────────────────────
     print('\n[mission_test] Step 4: Formation check at waypoint')

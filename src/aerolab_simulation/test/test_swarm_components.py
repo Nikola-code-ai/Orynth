@@ -1,3 +1,7 @@
+from math import pi
+
+import pytest
+
 from aerolab_simulation.formation import DIAMOND_FORMATION, FOLLOWER_IDS, LEADER_ID
 from aerolab_simulation.swarm_api import (
     AutonomyMode,
@@ -20,6 +24,15 @@ def test_expected_position_uses_relative_offsets():
     assert expected == (10.0, 1.0, 3.0)
 
 
+def test_expected_position_rotates_with_leader_yaw():
+    expected = DIAMOND_FORMATION.expected_position(
+        'drone1',
+        (0.0, 0.0, 2.0),
+        leader_yaw_rad=pi / 2,
+    )
+    assert expected == pytest.approx((0.0, 3.0, 2.0))
+
+
 def test_horizontal_drift_is_zero_when_follower_matches_slot():
     drift = DIAMOND_FORMATION.horizontal_drift(
         'drone4',
@@ -27,6 +40,16 @@ def test_horizontal_drift_is_zero_when_follower_matches_slot():
         follower_xy=(1.0, 5.0),
     )
     assert drift == 0.0
+
+
+def test_horizontal_drift_respects_leader_yaw():
+    drift = DIAMOND_FORMATION.horizontal_drift(
+        'drone3',
+        leader_xy=(2.0, -1.0),
+        follower_xy=(5.0, -1.0),
+        leader_yaw_rad=pi / 2,
+    )
+    assert drift == pytest.approx(0.0)
 
 
 def test_shared_swarm_types_capture_platform_boundary():
