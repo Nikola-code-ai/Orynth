@@ -30,19 +30,14 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 
 try:
-    from as2_python_api.drone_interface import DroneInterface
-except ImportError:
-    print('[mission_test] ERROR: as2_python_api not found.')
-    print('  Verify with: ros2 pkg list | grep as2_python_api')
+    from aerolab_simulation.formation import DIAMOND_FORMATION
+    from aerolab_simulation.swarm_api import LandRequest, MotionTarget, TakeoffRequest
+    from aerolab_simulation.as2_adapter import As2VehicleAdapter
+except ImportError as exc:
+    print(f'[mission_test] ERROR: {exc}')
+    print('  Verify the workspace is sourced and as2_python_api is available.')
     sys.exit(1)
 
-# ── Formation geometry (must match flock_orchestrator.py) ──────────────────────
-FORMATION_OFFSETS = {
-    'drone1': (3.0,  0.0),   # Front
-    'drone2': (0.0,  3.0),   # Left
-    'drone3': (0.0, -3.0),   # Right
-    'drone4': (-3.0, 0.0),   # Rear
-}
 FORMATION_TOLERANCE_M = 0.5   # max acceptable horizontal drift
 
 # ── Mission parameters ─────────────────────────────────────────────────────────
@@ -51,7 +46,6 @@ TAKEOFF_SPEED     = 0.5
 WAYPOINT          = [5.0, 0.0, 2.0]
 CRUISE_SPEED      = 1.0
 LAND_SPEED        = 0.3
-AIRBORNE_WAIT_S   = 15.0   # how long to wait for drone0 to be airborne
 AIRBORNE_HEIGHT_M = 0.5    # drone0 height threshold to consider it airborne
 
 
@@ -100,9 +94,7 @@ def check_formation(verifier: FormationVerifier, stage: str) -> bool:
     ly = leader_pose.position.y
 
     all_pass = True
-    for drone, (dx, dy) in FORMATION_OFFSETS.items():
-        expected_x = lx + dx
-        expected_y = ly + dy
+    for drone in DIAMOND_FORMATION.offsets:
         follower   = verifier.get_pose(drone)
 
         if follower is None:
@@ -110,8 +102,11 @@ def check_formation(verifier: FormationVerifier, stage: str) -> bool:
             all_pass = False
             continue
 
-        dist = ((follower.position.x - expected_x) ** 2 +
-                (follower.position.y - expected_y) ** 2) ** 0.5
+        dist = DIAMOND_FORMATION.horizontal_drift(
+            drone,
+            leader_xy=(lx, ly),
+            follower_xy=(follower.position.x, follower.position.y),
+        )
 
         if dist <= FORMATION_TOLERANCE_M:
             print(f'[{stage}] {drone}: PASS (drift={dist:.2f}m)')
@@ -126,8 +121,8 @@ def main():
     rclpy.init()
     verifier = FormationVerifier()
 
-    drone0 = DroneInterface(
-        drone_id='drone0',
+    drone0 = As2VehicleAdapter(
+        vehicle_id='drone0',
         use_sim_time=True,
         verbose=True
     )
@@ -144,11 +139,11 @@ def main():
         print(f'[mission_test] drone0 already airborne (z >= {AIRBORNE_HEIGHT_M}m). Skipping takeoff.')
     else:
         print(f'[mission_test] drone0 not airborne — attempting takeoff to {TAKEOFF_HEIGHT_M}m...')
-        result = drone0.takeoff(height=TAKEOFF_HEIGHT_M, speed=TAKEOFF_SPEED)
+        result = drone0.takeoff(TakeoffRequest(height_m=TAKEOFF_HEIGHT_M, speed_mps=TAKEOFF_SPEED))
         if not result:
             print('[mission_test] FAIL: TakeOff rejected or timed out.')
             print('  Are behavior action servers running? (drone_stack_launch.py)')
-            drone0.destroy_node()
+            drone0.close()
             verifier.destroy_node()
             rclpy.shutdown()
             sys.exit(1)
@@ -164,14 +159,11 @@ def main():
 
     # ── Step 3: Fly to waypoint ────────────────────────────────────────────────
     print(f'\n[mission_test] Step 3: GoTo {WAYPOINT} at {CRUISE_SPEED}m/s')
-    result = drone0.go_to.go_to_point(
-        point=WAYPOINT,
-        speed=CRUISE_SPEED,
-    )
+    result = drone0.go_to(MotionTarget(point=tuple(WAYPOINT), speed_mps=CRUISE_SPEED))
     if not result:
         print('[mission_test] FAIL: GoTo rejected or timed out.')
-        drone0.land(speed=LAND_SPEED)
-        drone0.destroy_node()
+        drone0.land(LandRequest(speed_mps=LAND_SPEED))
+        drone0.close()
         verifier.destroy_node()
         rclpy.shutdown()
         sys.exit(1)
@@ -188,7 +180,7 @@ def main():
     # Drones 1-4 will remain hovering at their last formation positions after
     # drone0 lands (follow_reference keeps them at the last known transform).
     print('\n[mission_test] Step 5: Landing drone0...')
-    drone0.land(speed=LAND_SPEED)
+    drone0.land(LandRequest(speed_mps=LAND_SPEED))
 
     # ── Summary ────────────────────────────────────────────────────────────────
     print('\n[mission_test] ═══ Results ═══')
@@ -197,7 +189,7 @@ def main():
     overall = hover_pass and waypoint_pass
     print(f'  Overall:            {"PASS" if overall else "FAIL"}\n')
 
-    drone0.destroy_node()
+    drone0.close()
     verifier.destroy_node()
     rclpy.shutdown()
     sys.exit(0 if overall else 1)

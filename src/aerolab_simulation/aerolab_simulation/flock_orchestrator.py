@@ -20,42 +20,25 @@ Prerequisites:
   - The follow_reference_behavior_node must be running per drone
     (it is launched by drone_stack_launch.py — no extra setup needed)
 
-Correct AS2 approach used here:
-  - DroneInterface.takeoff() calls the TakeOff action server
-  - FollowReferenceModule calls the FollowReference action server on each
-    follower drone with drone0/base_link as the reference TF frame
-  - The follow_reference behavior runs continuously: as drone0 moves, drones
-    1-4 update their targets via TF lookup in real time
+Current control path:
+  - The mission layer uses the shared VehicleAdapter contract
+  - As2VehicleAdapter maps that contract onto the current Aerostack2 Python API
+  - Followers track drone0/base_link continuously through FollowReference
 """
 
 import threading
 import time
 
 import rclpy
-from rclpy.executors import MultiThreadedExecutor
 
-try:
-    from as2_python_api.drone_interface import DroneInterface
-    from as2_python_api.modules.follow_reference_module import FollowReferenceModule
-except ImportError as e:
-    raise SystemExit(
-        f'[flock_orchestrator] Import error: {e}\n'
-        '  Ensure the workspace is sourced: source install/setup.bash'
-    )
-
-# ── Formation geometry ─────────────────────────────────────────────────────────
-# Offsets relative to drone0/base_link (FLU: x=forward, y=left, z=up)
-FORMATION = {
-    'drone1': (3.0,  0.0, 0.0),   # Front
-    'drone2': (0.0,  3.0, 0.0),   # Left
-    'drone3': (0.0, -3.0, 0.0),   # Right
-    'drone4': (-3.0, 0.0, 0.0),   # Rear
-}
+from aerolab_simulation.as2_adapter import As2VehicleAdapter
+from aerolab_simulation.formation import DIAMOND_FORMATION, FOLLOWER_IDS, LEADER_ID
+from aerolab_simulation.swarm_api import FollowReferenceRequest, TakeoffRequest
 
 # The TF frame that followers track.
 # AS2 state estimator with ground_truth plugin publishes:
 #   earth → droneN/map → droneN/odom → droneN/base_link
-MOTHERSHIP_FRAME = 'drone0/base_link'
+MOTHERSHIP_FRAME = f'{LEADER_ID}/base_link'
 
 # ── Mission parameters ─────────────────────────────────────────────────────────
 TAKEOFF_HEIGHT = 2.0   # metres
@@ -63,7 +46,7 @@ TAKEOFF_SPEED  = 0.5   # m/s
 FOLLOW_SPEED   = 2.0   # m/s per axis for formation tracking
 
 
-def _takeoff_worker(name: str, drone: DroneInterface, results: dict) -> None:
+def _takeoff_worker(name: str, drone: As2VehicleAdapter, results: dict) -> None:
     """
     Thread worker: arm, go offboard, then take off one drone (blocking).
 
@@ -77,12 +60,12 @@ def _takeoff_worker(name: str, drone: DroneInterface, results: dict) -> None:
         results[name] = False
         return
     print(f'[flock_orchestrator] {name}: enabling offboard mode...')
-    if not drone.offboard():
+    if not drone.enable_external_control():
         print(f'[flock_orchestrator] {name}: OFFBOARD FAILED.')
         results[name] = False
         return
     print(f'[flock_orchestrator] {name}: taking off to {TAKEOFF_HEIGHT} m...')
-    ok = drone.takeoff(height=TAKEOFF_HEIGHT, speed=TAKEOFF_SPEED)
+    ok = drone.takeoff(TakeoffRequest(height_m=TAKEOFF_HEIGHT, speed_mps=TAKEOFF_SPEED))
     results[name] = ok
     status = 'OK' if ok else 'FAILED'
     print(f'[flock_orchestrator] {name}: takeoff {status}.')
@@ -115,20 +98,21 @@ def start_formation(followers: dict) -> bool:
     TF at each control cycle as drone0 moves.
     """
     success = True
-    for name, (ox, oy, oz) in FORMATION.items():
-        drone = followers[name]
+    for name, (ox, oy, oz) in DIAMOND_FORMATION.offsets.items():
         print(
             f'[flock_orchestrator] {name}: follow_reference '
             f'offset=({ox:+.1f}, {oy:+.1f}, {oz:+.1f}) m '
             f'frame={MOTHERSHIP_FRAME}'
         )
-        ok = drone.follow_reference.follow_reference(
-            x=ox, y=oy, z=oz,
+        ok = followers[name].hold_reference(FollowReferenceRequest(
+            x=ox,
+            y=oy,
+            z=oz,
             frame_id=MOTHERSHIP_FRAME,
-            speed_x=FOLLOW_SPEED,
-            speed_y=FOLLOW_SPEED,
-            speed_z=FOLLOW_SPEED,
-        )
+            speed_x_mps=FOLLOW_SPEED,
+            speed_y_mps=FOLLOW_SPEED,
+            speed_z_mps=FOLLOW_SPEED,
+        ))
         status = 'ACTIVE' if ok else 'REJECTED'
         print(f'[flock_orchestrator] {name}: follow_reference {status}.')
         success = success and ok
@@ -154,7 +138,7 @@ def _wait_for_action(drones: dict, action_cls, action_name: str,
           f'(up to {timeout:.0f}s)...')
 
     for name, drone in drones.items():
-        tmp_clients[name] = ActionClient(drone, action_cls, f'/{name}/{action_name}')
+        tmp_clients[name] = ActionClient(drone.node, action_cls, f'/{name}/{action_name}')
 
     try:
         while pending and time.monotonic() < deadline:
@@ -199,13 +183,19 @@ def main(args=None) -> None:
     rclpy.init(args=args)
 
     print('[flock_orchestrator] Initialising drone interfaces...')
-    all_names = ['drone0', 'drone1', 'drone2', 'drone3', 'drone4']
-    follower_names = ['drone1', 'drone2', 'drone3', 'drone4']
+    all_names = [LEADER_ID, *FOLLOWER_IDS]
+    follower_names = list(FOLLOWER_IDS)
 
-    drones = {
-        name: DroneInterface(drone_id=name, use_sim_time=True, verbose=True)
-        for name in all_names
-    }
+    try:
+        drones = {
+            name: As2VehicleAdapter(vehicle_id=name, use_sim_time=True, verbose=True)
+            for name in all_names
+        }
+    except ImportError as exc:
+        raise SystemExit(
+            f'[flock_orchestrator] Import error: {exc}\n'
+            '  Ensure the workspace is sourced: source install/setup.bash'
+        ) from exc
     followers = {n: drones[n] for n in follower_names}
 
     print('[flock_orchestrator] All interfaces created. Checking action server readiness...')
@@ -216,13 +206,11 @@ def main(args=None) -> None:
     if not servers_ready:
         print('[flock_orchestrator] Action servers never became ready — is swarm_bringup_launch.py running?')
         for d in drones.values():
-            d.destroy_node()
+            d.close()
         rclpy.shutdown()
         return
 
-    print('[flock_orchestrator] All action servers ready. Attaching FollowReference modules...')
-    for name in follower_names:
-        drones[name].follow_reference = FollowReferenceModule(drone=drones[name])
+    print('[flock_orchestrator] All action servers ready. Starting takeoff sequence...')
 
     # ── Step 1: Simultaneous takeoff ───────────────────────────────────────────
     print(f'\n[flock_orchestrator] === Step 1: Takeoff (all {len(all_names)} drones) ===')
@@ -232,7 +220,7 @@ def main(args=None) -> None:
         print('[flock_orchestrator] Likely cause: TF chain (earth→base_link) not connected.')
         print('[flock_orchestrator] Check: ros2 run tf2_ros tf2_echo earth drone0/base_link')
         for d in drones.values():
-            d.destroy_node()
+            d.close()
         rclpy.shutdown()
         return
 
@@ -265,7 +253,7 @@ def main(args=None) -> None:
     finally:
         print('\n[flock_orchestrator] Shutting down...')
         for d in drones.values():
-            d.destroy_node()
+            d.close()
         rclpy.shutdown()
 
 
